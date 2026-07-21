@@ -4,20 +4,6 @@ Prebuilt **static, universal2 (arm64 + x86_64), LGPL** `ffmpeg` + `ffprobe` for
 macOS — with **libvpx** (VP8/VP9) and **libwebp**, and **no GPL** components
 (no x264/x265).
 
-## Why this exists
-
-The [Arcane](https://github.com/EricEngineering) desktop apps bundle `ffmpeg`/
-`ffprobe`. On **Windows and Linux** they download prebuilt **LGPL** builds from
-[BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds). There is **no
-equivalent prebuilt LGPL universal2 macOS build** to download, so this repo
-builds one from source, once, and publishes it as a release asset the apps'
-release workflows fetch — bringing macOS to the same "download a pinned binary"
-model as the other two platforms.
-
-The **LGPL, no-GPL** constraint matters for the proprietary **ArcaneAtlas-Vagabond**
-edition, which cannot ship GPL (x264/x265). The apps transcode opaque video to
-**VP9 via libvpx** (royalty-free), so no GPL encoder is needed.
-
 ## How to (re)build
 
 Rebuild only when bumping a version in
