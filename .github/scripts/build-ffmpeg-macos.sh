@@ -62,12 +62,16 @@ build_arch() {
     if [ "$ARCH" != "$(uname -m)" ]; then
       cross=(--enable-cross-compile --arch="$ARCH" --target-os=darwin --cc="clang $AF")
     fi
+    # NOTE: "${cross[@]+"${cross[@]}"}" — not "${cross[@]}". macOS ships bash 3.2,
+    # where expanding an EMPTY array under `set -u` (the native-arch pass, where
+    # cross is empty) errors with "unbound variable". This guarded form expands to
+    # nothing when the array is empty and to its elements otherwise.
     PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure --prefix="$PREFIX" \
       --disable-gpl --disable-nonfree --enable-static --disable-shared \
       --disable-doc --disable-debug --disable-programs --enable-ffmpeg --enable-ffprobe \
       --enable-libvpx --enable-libwebp \
       --extra-cflags="$AF -I$PREFIX/include" --extra-ldflags="$AF -L$PREFIX/lib" \
-      "${cross[@]}"
+      "${cross[@]+"${cross[@]}"}"
     make -j"$JOBS" )
   cp "ff-$ARCH/ffmpeg"  "$WORK/ffmpeg-$ARCH"
   cp "ff-$ARCH/ffprobe" "$WORK/ffprobe-$ARCH"
