@@ -66,8 +66,14 @@ build_arch() {
     # where expanding an EMPTY array under `set -u` (the native-arch pass, where
     # cross is empty) errors with "unbound variable". This guarded form expands to
     # nothing when the array is empty and to its elements otherwise.
+    # --pkg-config-flags=--static is REQUIRED for this all-static build: ffmpeg's
+    # configure link-tests each external lib, and static libwebp (1.4+) pulls in
+    # libsharpyuv via Requires.private/Libs.private. Without --static, pkg-config
+    # only emits -lwebp (not -lsharpyuv), the probe fails to link, and configure
+    # reports "libwebp >= 0.2.0 not found". Also covers libvpx's private deps.
     PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure --prefix="$PREFIX" \
       --disable-gpl --disable-nonfree --enable-static --disable-shared \
+      --pkg-config-flags="--static" \
       --disable-doc --disable-debug --disable-programs --enable-ffmpeg --enable-ffprobe \
       --enable-libvpx --enable-libwebp \
       --extra-cflags="$AF -I$PREFIX/include" --extra-ldflags="$AF -L$PREFIX/lib" \
