@@ -1,0 +1,62 @@
+name: Build LGPL ffmpeg (macOS universal2)
+
+# Manually triggered. Produces static, universal2 (arm64 + x86_64), LGPL ffmpeg +
+# ffprobe (libvpx + libwebp, NO GPL x264/x265) and publishes them as a release
+# asset that the Arcane apps' release workflows download into resources/bin.
+#
+# Rebuild only when you bump a version in build-ffmpeg-macos.sh (FFMPEG_VER /
+# LIBVPX_VER / LIBWEBP_VER) — then run this with a new `tag` and point the
+# consumer's FFMPEG_MACOS URL at it.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish under (bump when versions change)'
+        required: true
+        default: 'ffmpeg-7.1'
+
+permissions:
+  contents: write            # create/update the release + upload the asset
+
+jobs:
+  build:
+    runs-on: macos-14        # Apple Silicon; the x86_64 slice is cross-produced
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install nasm cmake pkg-config
+
+      - name: Build universal2 LGPL ffmpeg (~30-60 min)
+        run: bash .github/scripts/build-ffmpeg-macos.sh
+
+      - name: Verify (LGPL + libvpx + libwebp + universal2)
+        run: |
+          test -x out/ffmpeg && test -x out/ffprobe || { echo "::error::binaries missing"; exit 1; }
+          cfg="$(out/ffmpeg -hide_banner -version)"
+          echo "$cfg" | grep -q -- '--enable-libvpx'  || { echo "::error::ffmpeg lacks libvpx";  exit 1; }
+          echo "$cfg" | grep -q -- '--enable-libwebp' || { echo "::error::ffmpeg lacks libwebp"; exit 1; }
+          if echo "$cfg" | grep -q -- '--enable-gpl'; then
+            echo "::error::this is a GPL build; consumers require LGPL (no x264/x265)."; exit 1
+          fi
+          archs="$(lipo -archs out/ffmpeg)"
+          echo "archs: $archs"
+          echo "$archs" | grep -q arm64  || { echo "::error::missing arm64 slice";  exit 1; }
+          echo "$archs" | grep -q x86_64 || { echo "::error::missing x86_64 slice"; exit 1; }
+
+      - name: Package
+        run: tar -czf ffmpeg-macos-lgpl-universal2.tar.gz -C out ffmpeg ffprobe
+
+      - name: Publish release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: LGPL ffmpeg (universal2) — ${{ github.event.inputs.tag }}
+          body: |
+            Static, **universal2** (arm64 + x86_64), **LGPL** ffmpeg + ffprobe
+            (libvpx VP8/VP9 + libwebp, **no GPL** x264/x265). Built from upstream
+            source in CI (see `.github/scripts/build-ffmpeg-macos.sh`).
+
+            Consumed by the Arcane apps' release workflows via `FFMPEG_MACOS`.
+          files: ffmpeg-macos-lgpl-universal2.tar.gz
+          fail_on_unmatched_files: true
