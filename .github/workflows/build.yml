@@ -43,6 +43,20 @@ jobs:
           echo "archs: $archs"
           echo "$archs" | grep -q arm64  || { echo "::error::missing arm64 slice";  exit 1; }
           echo "$archs" | grep -q x86_64 || { echo "::error::missing x86_64 slice"; exit 1; }
+          # No dylib deps outside /usr/lib and /System — a "static" build that
+          # auto-detected a Homebrew lib (e.g. libxcb, 2026-07) dynamically links
+          # /opt/homebrew paths and is dead on user Macs without Homebrew. The
+          # runner HAS those libs, so `ffmpeg -version` above can't catch it;
+          # check each slice's load commands instead.
+          for bin in out/ffmpeg out/ffprobe; do
+            for arch in arm64 x86_64; do
+              ext="$(otool -arch "$arch" -L "$bin" | tail -n +2 | grep -vE '^\s+(/usr/lib/|/System/)' || true)"
+              if [ -n "$ext" ]; then
+                echo "::error::$bin ($arch) links non-system dylibs — not a static build:"; echo "$ext"; exit 1
+              fi
+            done
+          done
+          echo "static check OK: no non-system dylib deps in either slice"
 
       - name: Package
         run: tar -czf ffmpeg-macos-lgpl-universal2.tar.gz -C out ffmpeg ffprobe

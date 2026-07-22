@@ -71,11 +71,20 @@ build_arch() {
     # libsharpyuv via Requires.private/Libs.private. Without --static, pkg-config
     # only emits -lwebp (not -lsharpyuv), the probe fails to link, and configure
     # reports "libwebp >= 0.2.0 not found". Also covers libvpx's private deps.
+    # --disable-xlib --disable-libxcb: ffmpeg's configure AUTO-DETECTS optional
+    # libs, and the CI runner has Homebrew X11 libs installed — the native arm64
+    # pass silently picked them up (x11grab support) and DYNAMICALLY linked
+    # /opt/homebrew/opt/{libxcb,libx11,...} dylibs, making the arm64 slice dead
+    # on any user Mac without Homebrew (the cross x86_64 pass couldn't see the
+    # arm64 brew libs, so only that slice was clean — caught 2026-07 on a
+    # brew-less dev Mac). Screen capture isn't needed; the workflow's Verify step
+    # now also otool-checks both slices for non-system dylib deps.
     PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" ./configure --prefix="$PREFIX" \
       --disable-gpl --disable-nonfree --enable-static --disable-shared \
       --pkg-config-flags="--static" \
       --disable-doc --disable-debug --disable-programs --enable-ffmpeg --enable-ffprobe \
       --enable-libvpx --enable-libwebp \
+      --disable-xlib --disable-libxcb \
       --extra-cflags="$AF -I$PREFIX/include" --extra-ldflags="$AF -L$PREFIX/lib" \
       "${cross[@]+"${cross[@]}"}"
     make -j"$JOBS" )
